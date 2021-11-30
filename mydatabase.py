@@ -1,11 +1,14 @@
-# use code with some adaptation from https://thinkdiff.net/how-to-use-python-sqlite3-using-sqlalchemy-158f9c54eb32
-
+"""
+This module contains classes to work with database
+use code with some adaptation from https://thinkdiff.net/how-to-use-python-sqlite3-using-sqlalchemy-158f9c54eb32
+"""
 from sqlalchemy import create_engine
 from sqlalchemy import Table, Column, Integer,  MetaData, Float
+from UserDefinedExceptions import NotAppropriateDatabaseTypeError
+import sys
 
 # Variables
 SQLITE = 'sqlite'
-
 # Table Names
 TRAIN = 'training_functions'
 IDEAL = 'ideal_functions'
@@ -13,24 +16,46 @@ TEST = 'test_functions'
 
 
 class MyDatabase:
+    """
+    This class for creating object to work with database
+    """
     DB_ENGINE = {
         SQLITE: 'sqlite:///{DB}'
     }
-
     # Main DB Connection Ref Obj
     db_engine = None
 
     def __init__(self, dbtype, username='', password='', dbname=''):
-        dbtype = dbtype.lower()
-        if dbtype in self.DB_ENGINE.keys():
-            engine_url = self.DB_ENGINE[dbtype].format(DB=dbname)
-            self.db_engine = create_engine(engine_url)
-            print(self.db_engine)
-        else:
-            print("DBType is not found in DB_ENGINE")
+        """
+        function to initialize an object and check and set parameters
+        :param dbtype: type of the database. example - sqlite
+        :param username: username to get access to the DB
+        :param password: password to get access to the DB
+        :param dbname: the name of DB
+        """
+        try:
+            dbtype = dbtype.lower()
+            if dbtype in self.DB_ENGINE.keys():
+                engine_url = self.DB_ENGINE[dbtype].format(DB=dbname)
+                self.db_engine = create_engine(engine_url)
+                print(self.db_engine)
+            else:
+                raise NotAppropriateDatabaseTypeError(allowed_dbtypes=self.DB_ENGINE.keys())
+        except NotAppropriateDatabaseTypeError:
+            print(sys.exc_info()[1])
+            sys.exit(1)
+        except Exception:
+            exception_type, exception_value, exception_traceback = sys.exc_info()
+            print("Error. Please check database parameters")
+            print(''.join('[Error Message]: ' + str(exception_value) + ' ' +
+                          '[Error Type]: ' + str(exception_type)))
+            sys.exit(1)
 
     # create tables
     def create_db_tables(self):
+        """
+        function to create tables in the database
+        """
         metadata = MetaData()
 
         train = Table(TRAIN, metadata,
@@ -79,40 +104,70 @@ class MyDatabase:
 
         try:
             metadata.create_all(self.db_engine)
-            print("Tables are created")
-        except Exception as e:
-            print("Error occurred during table creation!")
-            print(e)
+            # print("Tables are created")
+        except Exception:
+            exception_type, exception_value, exception_traceback = sys.exc_info()
+            print("Error occurred during table creation! Please check database parameters")
+            print(''.join('[Error Message]: ' + str(exception_value) + ' ' +
+                          '[Error Type]: ' + str(exception_type)))
+            sys.exit(1)
 
-    # Insert, Update, Delete with query
+    # Insert, Update, Delete with sql query
     def execute_query(self, query=''):
+        """
+        function to Insert, Update, Delete with sql query
+        :param query: sql query to execute
+        """
         if query == '':
             return
-        # print(query)
         with self.db_engine.connect() as connection:
             try:
                 connection.execute(query)
-            except Exception as e:
-                print(e)
+            except Exception:
+                exception_type, exception_value, exception_traceback = sys.exc_info()
+                print("Error occurred during sql query execution! Please check the correctness of your sql query")
+                print(''.join('[Error Message]: ' + str(exception_value) + ' ' +
+                              '[Error Type]: ' + str(exception_type)))
+                sys.exit(1)
 
     # Insert pandas DataFrame
     def insert_dataframe(self, df, table):
+        """
+        function to Insert pandas DF into the table
+        :param df: pandas dataframe to insert
+        :param table: the name of table to insert into
+        """
         try:
             df.to_sql(table, con=self.db_engine, if_exists='replace', index=False)
-        except Exception as e:
-            print(e)
+        except Exception:
+            exception_type, exception_value, exception_traceback = sys.exc_info()
+            print("Error occurred during sql query execution! Please check the correctness of pandas DF and the \
+            name of database table")
+            print(''.join('[Error Message]: ' + str(exception_value) + ' ' +
+                          '[Error Type]: ' + str(exception_type)))
+            sys.exit(1)
 
     # method will print all the data from a database table we provided as a parameter.
     def print_all_data(self, table='', query=''):
+        """
+        function to print data from the DB table
+        :param query: sql query to execute
+        :param table: the name of table to read dats from
+        """
         query = query if query != '' else "SELECT * FROM '{}';".format(table)
         print(query)
         with self.db_engine.connect() as connection:
             try:
                 result = connection.execute(query)
-            except Exception as e:
-                print(e)
+            except Exception:
+                exception_type, exception_value, exception_traceback = sys.exc_info()
+                print("Error occurred during sql query execution! Please check the correctness of your sql query")
+                print(''.join('[Error Message]: ' + str(exception_value) + ' ' +
+                              '[Error Type]: ' + str(exception_type)))
+                sys.exit(1)
+            # if there is no exception
             else:
                 for row in result:
-                    print(row)  # print(row[0], row[1], row[2])
+                    print(row)
                 result.close()
         print("\n")
